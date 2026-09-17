@@ -1,0 +1,6 @@
+discord.py
+python-dotenv
+aiohttp
+feedparser
+httpx
+aiosqlite
