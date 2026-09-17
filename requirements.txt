@@ -4,3 +4,4 @@ aiohttp
 feedparser
 httpx
 aiosqlite
+apscheduler
