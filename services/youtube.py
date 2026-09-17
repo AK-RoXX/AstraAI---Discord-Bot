@@ -1,47 +1,99 @@
 import os
 import httpx
 
-API_KEY = os.getenv("YOUTUBE_API_KEY", "")
+
+API_KEY = os.getenv("YOUTUBE_API_KEY")
+
+YOUTUBE_SEARCH_URL = (
+    "https://www.googleapis.com/youtube/v3/search"
+)
 
 
-async def recommend_videos(topic="agentic AI"):
+async def search_youtube(
+    query: str,
+    max_results: int = 10,
+):
+
     if not API_KEY:
-        # Fallback links are search URLs, avoiding a fake claim about a specific video.
-        from urllib.parse import quote_plus
-        q = quote_plus(topic)
-        return [
-            {"title": f"YouTube search: {topic}", "channel": "YouTube", "url": f"https://www.youtube.com/results?search_query={q}"},
-        ]
+        raise RuntimeError(
+            "YOUTUBE_API_KEY is not configured."
+        )
 
     params = {
         "part": "snippet",
-        "q": topic,
+        "q": query,
         "type": "video",
         "order": "relevance",
-        "maxResults": 5,
+        "maxResults": max_results,
         "relevanceLanguage": "en",
+        "regionCode": "IN",
         "safeSearch": "moderate",
     }
 
-    async with httpx.AsyncClient(timeout=20) as client:
-        r = await client.get(
-            "https://www.googleapis.com/youtube/v3/search",
-            params={**params, "key": API_KEY},
-        )
-        r.raise_for_status()
-        data = r.json()
+    async with httpx.AsyncClient(
+        timeout=20
+    ) as client:
 
-    results = []
+        response = await client.get(
+            YOUTUBE_SEARCH_URL,
+            params={
+                **params,
+                "key": API_KEY,
+            },
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+    videos = []
+
     for item in data.get("items", []):
-        vid = item.get("id", {}).get("videoId")
-        if not vid:
+
+        video_id = (
+            item
+            .get("id", {})
+            .get("videoId")
+        )
+
+        if not video_id:
             continue
-        sn = item.get("snippet", {})
-        results.append({
-            "title": sn.get("title", ""),
-            "channel": sn.get("channelTitle", ""),
-            "url": f"https://www.youtube.com/watch?v={vid}",
-            "published": sn.get("publishedAt", ""),
-            "description": sn.get("description", "")[:500],
+
+        snippet = item.get(
+            "snippet",
+            {}
+        )
+
+        videos.append({
+            "id": video_id,
+            "title": snippet.get(
+                "title",
+                ""
+            ),
+            "description": snippet.get(
+                "description",
+                ""
+            ),
+            "channel": snippet.get(
+                "channelTitle",
+                ""
+            ),
+            "published": snippet.get(
+                "publishedAt",
+                ""
+            ),
+            "url":
+                f"https://www.youtube.com/watch?v={video_id}",
+            "thumbnail":
+                snippet.get(
+                    "thumbnails",
+                    {}
+                ).get(
+                    "high",
+                    {}
+                ).get(
+                    "url"
+                ),
         })
-    return results
+
+    return videos
